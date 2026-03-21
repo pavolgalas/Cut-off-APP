@@ -2,9 +2,6 @@
 # coding: utf-8
 
 # In[1]:
-Perfect! Here's the updated code with both slider + number input for cutoffs (sync perfectly):
-
-python
 import streamlit as st
 import pandas as pd
 import plotly.express as px
