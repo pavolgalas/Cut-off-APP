@@ -2,6 +2,9 @@
 # coding: utf-8
 
 # In[1]:
+Perfect! Here's the updated code with both slider + number input for cutoffs (sync perfectly):
+
+python
 import streamlit as st
 import pandas as pd
 import plotly.express as px
@@ -14,6 +17,7 @@ st.markdown("""
 <style>
 .metric-card {background: linear-gradient(135deg,#f5f7fa 0%,#c3cfe2 100%);padding:1rem;border-radius:10px;border-left:5px solid #1f77b4;}
 .stMetric > label {font-size:1.2rem!important;color:#1f1f1f!important;}
+.cutoff-input {display: flex; gap: 10px; align-items: center;}
 </style>
 """, unsafe_allow_html=True)
 
@@ -21,7 +25,7 @@ st.markdown("""
 def load_data(file_bytes):
     df = pd.read_excel(io.BytesIO(file_bytes))
     required_cols = [
-        'Sector',  # NEW: sector column (SCH, VET, ADU)
+        'Sector', 
         'Final report score (Average)',
         'Absorption rate (Average)',
         'Progress report score',
@@ -67,7 +71,7 @@ def show_data_preview(df, cutoffs):
 
     # Histograms with dynamic cutoff lines
     st.subheader("📉 Distribution vs Cutoff Lines")
-    st.markdown("🔴 Red dashed line = current cutoff value (for filtered data).")
+    st.markdown("**🔴 Red dashed line = current cutoff value (updates with slider OR number input)**")
 
     cols = st.columns(2)
     for i, col in enumerate(criteria):
@@ -179,16 +183,15 @@ def create_pie_charts(metrics, criteria_display):
 
 # MAIN APP
 st.title("🎯 Project Cutoff Analysis Tool")
-st.markdown("Upload data → filter by sector → set cutoffs → analyze.")
+st.markdown("Upload → filter sector → set cutoffs → analyze.")
 
 uploaded_file = st.sidebar.file_uploader("📁 Upload Excel", type=['xlsx', 'xls'])
 
 if uploaded_file is not None:
     df_full = load_data(uploaded_file.read())
 
-    # NEW: Sector filter above sliders
+    # Sector filter
     st.sidebar.header("📂 Sector Filter")
-    # assume sector values like SCH, VET, ADU
     sector_options = ['All'] + sorted(df_full['Sector'].dropna().unique().tolist())
     selected_sector = st.sidebar.selectbox(
         "Select sector",
@@ -201,7 +204,7 @@ if uploaded_file is not None:
     else:
         df = df_full[df_full['Sector'] == selected_sector].copy()
 
-    st.sidebar.caption(f"Filtered projects: {len(df)} / {len(df_full)}")
+    st.sidebar.caption(f"Showing {len(df)} / {len(df_full)} projects")
 
     criteria_display = {
         'Final report score (Average)': 'Final Report Score',
@@ -212,66 +215,59 @@ if uploaded_file is not None:
 
     st.sidebar.header("🎯 Cutoff Thresholds")
 
-    # sensible defaults based on filtered df
+    # NEW: Dual input - Slider + Number field (fully synced)
+    def cutoff_input(label, col, min_val, max_val, default):
+        st.markdown(f"**{label}**")
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            slider_val = st.slider("", min_value=min_val, max_value=max_val, 
+                                 value=default, step=0.5, key=f"slider_{col}")
+        with col2:
+            number_val = st.number_input("", min_value=min_val, max_value=max_val, 
+                                       value=slider_val, step=0.5, 
+                                       key=f"number_{col}", format="%.1f")
+        return number_val  # Number input takes precedence, slider follows
+
     def safe_quantile(series, q, fallback):
         series = series.dropna()
         return float(series.quantile(q)) if len(series) > 0 else fallback
 
     cutoffs = {}
-    cutoffs['Final report score (Average)'] = st.sidebar.slider(
-        "Final Report Score",
-        0.0,
-        100.0,
-        safe_quantile(df['Final report score (Average)'], 0.75, 75.0),
-        0.5,
+    cutoffs['Final report score (Average)'] = cutoff_input(
+        "Final Report Score", 
+        'Final report score (Average)', 0.0, 100.0, 
+        safe_quantile(df['Final report score (Average)'], 0.75, 75.0)
     )
-    cutoffs['Absorption rate (Average)'] = st.sidebar.slider(
-        "Absorption Rate",
-        0.0,
-        100.0,
-        safe_quantile(df['Absorption rate (Average)'], 0.75, 75.0),
-        0.5,
+    cutoffs['Absorption rate (Average)'] = cutoff_input(
+        "Absorption Rate", 
+        'Absorption rate (Average)', 0.0, 100.0, 
+        safe_quantile(df['Absorption rate (Average)'], 0.75, 75.0)
     )
-    cutoffs['Progress report score'] = st.sidebar.slider(
-        "Progress Report",
-        0.0,
-        45.0,
-        safe_quantile(df['Progress report score'], 0.75, 30.0),
-        0.5,
+    cutoffs['Progress report score'] = cutoff_input(
+        "Progress Report", 
+        'Progress report score', 0.0, 45.0, 
+        safe_quantile(df['Progress report score'], 0.75, 30.0)
     )
-    cutoffs['QS report score'] = st.sidebar.slider(
-        "QS Report",
-        0.0,
-        45.0,
-        safe_quantile(df['QS report score'], 0.75, 30.0),
-        0.5,
+    cutoffs['QS report score'] = cutoff_input(
+        "QS Report", 
+        'QS report score', 0.0, 45.0, 
+        safe_quantile(df['QS report score'], 0.75, 30.0)
     )
 
-    # preview + histograms based on FILTERED data
+    # All visuals use filtered data + current cutoffs
     show_data_preview(df, cutoffs)
 
-    st.header("🎯 Analysis Results (Filtered)")
+    st.header("🎯 Live Analysis Results")
     metrics = calculate_metrics(df, cutoffs)
 
     col1, col2, col3 = st.columns(3)
     with col1:
-        st.metric(
-            "🎉 Pass ALL",
-            f"{metrics['overall']['pass']:,}",
-            f"{metrics['overall']['pass_pct']:.1f}%",
-        )
+        st.metric("🎉 Pass ALL", f"{metrics['overall']['pass']:,}", f"{metrics['overall']['pass_pct']:.1f}%")
     with col2:
-        st.metric(
-            "❌ Fail ANY",
-            f"{metrics['overall']['fail']:,}",
-            f"{metrics['overall']['fail_pct']:.1f}%",
-        )
+        st.metric("❌ Fail ANY", f"{metrics['overall']['fail']:,}", f"{metrics['overall']['fail_pct']:.1f}%")
     with col3:
-        st.metric(
-            "📈 Evaluated",
-            f"{metrics['overall']['total_evaluated']:,}",
-            f"{len(df):,} in sector" if selected_sector != 'All' else f"{len(df):,} total",
-        )
+        st.metric("📈 Evaluated", f"{metrics['overall']['total_evaluated']:,}", 
+                f"{len(df):,} in filter")
 
     st.subheader("📋 Detailed Results")
     summary_data = []
@@ -282,7 +278,7 @@ if uploaded_file is not None:
             'Cutoff': f"{cutoffs[c]:.1f}",
             '✅ Pass': f"{m['pass']:,} ({m['pass_pct']:.1f}%)",
             '❌ Fail': f"{m['fail']:,} ({m['fail_pct']:.1f}%)",
-            '📄 No Data': f"{m['no_data']:,} ({m['no_data_pct']:.1f}%)",
+            '📄 No Data': f"{m['no_data']:,} ({m['no_data_pct']:.1f}%)"
         })
     st.dataframe(pd.DataFrame(summary_data), use_container_width=True)
 
@@ -291,22 +287,21 @@ if uploaded_file is not None:
     st.plotly_chart(fig, use_container_width=True)
 
     csv_data = pd.DataFrame(summary_data).to_csv(index=False).encode('utf-8')
-    st.download_button(
-        "💾 Download Results CSV",
-        csv_data,
-        f"cutoff_analysis_{selected_sector.lower() if selected_sector!='All' else 'all'}.csv",
-        "text/csv",
-    )
+    st.download_button("💾 Download CSV", csv_data, 
+                     f"analysis_{selected_sector.lower() if selected_sector != 'All' else 'all'}.csv", 
+                     "text/csv")
+
 else:
-    st.info(
-        "👈 Upload an Excel file to start.\n\n"
-        "Required columns (including new one):\n"
-        "• Sector (e.g. SCH, VET, ADU)\n"
-        "• Final report score (Average)\n"
-        "• Absorption rate (Average)\n"
-        "• Progress report score\n"
-        "• QS report score"
-    )
+    st.info("""
+    **👈 Upload Excel file**
+    
+    Required columns:
+    • Sector (SCH, VET, ADU)
+    • Final report score (Average) (0-100)
+    • Absorption rate (Average) (0-100)
+    • Progress report score (0-45)
+    • QS report score (0-45)
+    """)
 # In[ ]:
 
 
