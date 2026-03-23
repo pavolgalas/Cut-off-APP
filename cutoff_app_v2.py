@@ -253,7 +253,6 @@ def create_sector_pies(sector_metrics, overall_mode):
     fig.update_layout(height=400, title=dict(text=title, x=0.5))
     return fig
 
-# ── NEW: Adjusted for 1x4 horizontal layout with separating lines ─────────────
 def create_pie_charts(metrics, criteria_display):
     fig = make_subplots(
         rows=1, cols=4,
@@ -278,9 +277,9 @@ def create_pie_charts(metrics, criteria_display):
             row=1, col=i+1,
         )
         
-    # Draw shapes acting as visual vertical line separators between subplots
+    # Standardize height to 400 to match the other pies perfectly
     fig.update_layout(
-        height=400,  # Adjusted height for 1 row
+        height=400,
         margin=dict(t=50, b=20, l=10, r=10),
         shapes=[
             dict(type="line", xref="paper", yref="paper", x0=0.24, y0=0.1, x1=0.24, y1=0.9, line=dict(color="rgba(128,128,128,0.2)", width=2)),
