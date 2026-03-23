@@ -253,19 +253,18 @@ def create_sector_pies(sector_metrics, overall_mode):
     fig.update_layout(height=400, title=dict(text=title, x=0.5))
     return fig
 
+# ── NEW: Adjusted for 1x4 horizontal layout with separating lines ─────────────
 def create_pie_charts(metrics, criteria_display):
     fig = make_subplots(
-        rows=2, cols=2,
+        rows=1, cols=4,
         subplot_titles=list(criteria_display.values()),
-        specs=[[{"type": "pie"}, {"type": "pie"}], [{"type": "pie"}, {"type": "pie"}]],
+        specs=[[{"type": "pie"}, {"type": "pie"}, {"type": "pie"}, {"type": "pie"}]],
     )
     criteria_list = list(criteria_display.keys())
     colors = ['#4CAF50', '#F44336', '#FF9800']
     labels = ['✅ Pass', '❌ Fail', '📄 No Data']
 
     for i, criterion in enumerate(criteria_list):
-        row = 1 if i < 2 else 2
-        col = 1 if i % 2 == 0 else 2
         m = metrics[criterion]
         fig.add_trace(
             go.Pie(
@@ -274,10 +273,21 @@ def create_pie_charts(metrics, criteria_display):
                 marker=dict(colors=colors, line=dict(color='#000', width=1)),
                 textinfo='label+percent',
                 showlegend=False,
+                hovertemplate='<b>%{label}</b><br>Projects: %{value}<br>Share: %{percent}<extra></extra>'
             ),
-            row=row, col=col,
+            row=1, col=i+1,
         )
-    fig.update_layout(height=700, title="📊 Per-Criterion Distribution")
+        
+    # Draw shapes acting as visual vertical line separators between subplots
+    fig.update_layout(
+        height=400,  # Adjusted height for 1 row
+        margin=dict(t=50, b=20, l=10, r=10),
+        shapes=[
+            dict(type="line", xref="paper", yref="paper", x0=0.24, y0=0.1, x1=0.24, y1=0.9, line=dict(color="rgba(128,128,128,0.2)", width=2)),
+            dict(type="line", xref="paper", yref="paper", x0=0.50, y0=0.1, x1=0.50, y1=0.9, line=dict(color="rgba(128,128,128,0.2)", width=2)),
+            dict(type="line", xref="paper", yref="paper", x0=0.76, y0=0.1, x1=0.76, y1=0.9, line=dict(color="rgba(128,128,128,0.2)", width=2)),
+        ]
+    )
     return fig
 
 # ── MAIN APP ──────────────────────────────────────────────────────────────────
@@ -306,9 +316,9 @@ if uploaded_file is not None:
     overall_mode = "all_data" if "1." in mode_label else "all_projects"
 
     if overall_mode == "all_data":
-        st.sidebar.caption("✏️ Only accreditations with all 4 criteria available are evaluated.")
+        st.sidebar.caption("✏️ Only projects with all 4 scores filled are evaluated.")
     else:
-        st.sidebar.caption("✏️ Every accreditation is evaluated. Pass = meets cutoff on all available criteria.")
+        st.sidebar.caption("✏️ Every project is classified. Pass = meets cutoff on all criteria where data exists.")
 
     st.sidebar.header("🎯 Cutoff Thresholds")
 
@@ -397,7 +407,6 @@ if uploaded_file is not None:
         with col3:
             st.metric("📄 No Data (all criteria missing)", f"{overall['no_data_all']:,}")
 
-    # ── NEW: Side-by-Side Overall & Sector Pie Charts ────────────────────────
     col_pie_main, col_divider, col_pie_sec = st.columns([10, 1, 10])
     with col_pie_main:
         st.plotly_chart(create_overall_pie(overall, overall_mode), use_container_width=True)
