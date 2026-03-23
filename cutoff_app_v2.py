@@ -14,23 +14,28 @@ import os
 st.set_page_config(page_title="Project Cutoff Analysis", page_icon="🎯", layout="wide")
 
 # ── LOGO SETUP ────────────────────────────────────────────────────────────────
-# Option 1: Top left sidebar logo (requires Streamlit >= 1.35.0)
-# Replace "logo.png" with the path to your actual logo file.
 LOGO_PATH = "logo.png"
 
-if os.path.exists("logo.png"):
+if os.path.exists(LOGO_PATH):
     try:
-        st.logo("logo.png", icon_image=LOGO_PATH)
+        st.logo(LOGO_PATH, icon_image=LOGO_PATH)
     except AttributeError:
-        # Fallback for older Streamlit versions
-        st.sidebar.image("logo.png", use_column_width=True)
+        st.sidebar.image(LOGO_PATH, use_column_width=True)
 
 st.markdown("""
 <style>
 .metric-card {background: linear-gradient(135deg,#f5f7fa 0%,#c3cfe2 100%);padding:1rem;border-radius:10px;border-left:5px solid #1f77b4;}
-/* Increase metric delta (the green/red text below the number) size by ~50% */
+/* Increase metric delta size by ~50% */
 [data-testid="stMetricDelta"] > div {font-size: 1.4rem !important;}
 [data-testid="stMetricDelta"] svg {width: 1.5rem !important; height: 1.5rem !important;}
+/* Divider line for pie charts */
+.vline {
+    border-left: 2px solid rgba(128, 128, 128, 0.2);
+    height: 350px;
+    margin: auto;
+    margin-top: 50px;
+    width: 1px;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -39,7 +44,7 @@ def load_data(file_bytes):
     df = pd.read_excel(io.BytesIO(file_bytes))
     required_cols = [
         'Project ID', 'Organization name', 'Sector',
-        'Final report score (Average)', 'Absorption rate (Average)',
+        'Final report score', 'Absorption rate',
         'Progress report score', 'QS report score'
     ]
     missing = [col for col in required_cols if col not in df.columns]
@@ -50,10 +55,10 @@ def load_data(file_bytes):
 
 def show_data_preview(df, cutoffs):
     st.header("📊 Data Distribution & Statistics")
-    criteria = ['Final report score (Average)','Absorption rate (Average)','Progress report score','QS report score']
+    criteria = ['Final report score','Absorption rate','Progress report score','QS report score']
     criteria_display = {
-        'Final report score (Average)': 'Final Report Score',
-        'Absorption rate (Average)': 'Absorption Rate',
+        'Final report score': 'Final Report Score',
+        'Absorption rate': 'Absorption Rate',
         'Progress report score': 'Progress Report',
         'QS report score': 'QS Report'
     }
@@ -93,9 +98,10 @@ def show_data_preview(df, cutoffs):
 
 def calculate_metrics(df, cutoffs, overall_mode="all_data"):
     metrics = {}
-    criteria = ['Final report score (Average)','Absorption rate (Average)',
+    criteria = ['Final report score','Absorption rate',
                 'Progress report score','QS report score']
 
+    # Per-criterion metrics
     for criterion in criteria:
         col_data = df[criterion].dropna()
         pass_count = (col_data >= cutoffs[criterion]).sum()
@@ -111,12 +117,20 @@ def calculate_metrics(df, cutoffs, overall_mode="all_data"):
             'no_data_pct': no_data / total * 100 if total > 0 else 0,
         }
 
+    # Overall metrics
     overall_pass = 0
     overall_fail = 0
     overall_no_data_all = 0
     failed_projects_data = []
+    
+    # Track per-sector
+    sector_metrics = {}
 
     for _, row in df.iterrows():
+        sector = row['Sector']
+        if sector not in sector_metrics:
+            sector_metrics[sector] = {'pass': 0, 'fail': 0, 'no_data_all': 0}
+            
         has_all_data  = all(pd.notna(row[c]) for c in criteria)
         applicable    = [c for c in criteria if pd.notna(row[c])]
 
@@ -125,27 +139,34 @@ def calculate_metrics(df, cutoffs, overall_mode="all_data"):
                 failed_crits = [c for c in criteria if row[c] < cutoffs[c]]
                 if not failed_crits:
                     overall_pass += 1
+                    sector_metrics[sector]['pass'] += 1
                 else:
                     overall_fail += 1
+                    sector_metrics[sector]['fail'] += 1
                     failed_projects_data.append({
                         'Project ID': row['Project ID'],
-                        'Sector': row['Sector'],
+                        'Sector': sector,
                         'Organization name': row['Organization name'],
                         'Failed Criteria Raw': failed_crits
                     })
+            else:
+                sector_metrics[sector]['no_data_all'] += 1
 
         elif overall_mode == "all_projects":
             if not applicable:
                 overall_no_data_all += 1
+                sector_metrics[sector]['no_data_all'] += 1
             else:
                 failed_crits = [c for c in applicable if row[c] < cutoffs[c]]
                 if not failed_crits:
                     overall_pass += 1
+                    sector_metrics[sector]['pass'] += 1
                 else:
                     overall_fail += 1
+                    sector_metrics[sector]['fail'] += 1
                     failed_projects_data.append({
                         'Project ID': row['Project ID'],
-                        'Sector': row['Sector'],
+                        'Sector': sector,
                         'Organization name': row['Organization name'],
                         'Failed Criteria Raw': failed_crits
                     })
@@ -179,6 +200,7 @@ def calculate_metrics(df, cutoffs, overall_mode="all_data"):
         }
         
     metrics['failed_projects'] = failed_projects_data
+    metrics['sector_metrics'] = sector_metrics
 
     return metrics
 
@@ -187,20 +209,48 @@ def create_overall_pie(overall, overall_mode):
         labels = ['✅ Pass', '❌ Fail']
         values = [overall['pass'], overall['fail']]
         colors = ['#4CAF50', '#F44336']
-        title = "Overall (projects with ALL criteria filled)"
+        title = "Overall Evaluation"
     else:
         labels = ['✅ Pass', '❌ Fail']
         values = [overall['pass'], overall['fail']]
         colors = ['#4CAF50', '#F44336']
-        title = "Overall (all evaluated projects)"
+        title = "Overall Evaluation (Evaluated Projects)"
 
     fig = go.Figure(go.Pie(
         labels=labels, values=values,
         marker=dict(colors=colors, line=dict(color='#000', width=1)),
-        textinfo='label+percent', showlegend=True,
+        textinfo='label+percent', showlegend=False,
         hovertemplate='<b>%{label}</b><br>Projects: %{value}<br>Share: %{percent}<extra></extra>'
     ))
-    fig.update_layout(height=400, title=title)
+    fig.update_layout(height=400, title=dict(text=title, x=0.5))
+    return fig
+
+def create_sector_pies(sector_metrics, overall_mode):
+    sectors = sorted(list(sector_metrics.keys()))
+    n = len(sectors)
+    
+    fig = make_subplots(rows=1, cols=n, subplot_titles=sectors, specs=[[{"type": "pie"}] * n])
+
+    labels = ['✅ Pass', '❌ Fail']
+    colors = ['#4CAF50', '#F44336']
+
+    for i, sector in enumerate(sectors):
+        m = sector_metrics[sector]
+        values = [m['pass'], m['fail']]
+
+        fig.add_trace(
+            go.Pie(
+                labels=labels, values=values,
+                marker=dict(colors=colors, line=dict(color='#000', width=1)),
+                textinfo='percent',
+                showlegend=False,
+                hovertemplate='<b>%{label}</b><br>Projects: %{value}<br>Share: %{percent}<extra></extra>'
+            ),
+            row=1, col=i+1
+        )
+        
+    title = "By Sector" if overall_mode == "all_data" else "By Sector (Evaluated Projects)"
+    fig.update_layout(height=400, title=dict(text=title, x=0.5))
     return fig
 
 def create_pie_charts(metrics, criteria_display):
@@ -231,14 +281,6 @@ def create_pie_charts(metrics, criteria_display):
     return fig
 
 # ── MAIN APP ──────────────────────────────────────────────────────────────────
-# Option 2: Main page header logo (uncomment if you want a big logo at the top)
-# if os.path.exists(LOGO_PATH):
-#     col_logo, col_title = st.columns([1, 4])
-#     with col_logo:
-#         st.image(LOGO_PATH, width=100)
-#     with col_title:
-#         st.title("🎯 Project Cutoff Analysis Tool")
-# else:
 st.title("🎯 Project Cutoff Analysis Tool")
 
 uploaded_file = st.sidebar.file_uploader("📁 Upload Excel", type=['xlsx', 'xls'])
@@ -306,12 +348,12 @@ if uploaded_file is not None:
         return st.session_state[f"num_{col_key}"]
 
     cutoffs = {}
-    cutoffs['Final report score (Average)'] = cutoff_widget(
+    cutoffs['Final report score'] = cutoff_widget(
         "Final Report Score", "final", 0.0, 100.0,
-        safe_quantile(df['Final report score (Average)'], 0.75, 75.0))
-    cutoffs['Absorption rate (Average)'] = cutoff_widget(
+        safe_quantile(df['Final report score'], 0.75, 75.0))
+    cutoffs['Absorption rate'] = cutoff_widget(
         "Absorption Rate", "absorb", 0.0, 100.0,
-        safe_quantile(df['Absorption rate (Average)'], 0.75, 75.0))
+        safe_quantile(df['Absorption rate'], 0.75, 75.0))
     cutoffs['Progress report score'] = cutoff_widget(
         "Progress Report", "progress", 0.0, 45.0,
         safe_quantile(df['Progress report score'], 0.75, 30.0))
@@ -320,8 +362,8 @@ if uploaded_file is not None:
         safe_quantile(df['QS report score'], 0.75, 30.0))
 
     criteria_display = {
-        'Final report score (Average)': 'Final Report Score',
-        'Absorption rate (Average)': 'Absorption Rate',
+        'Final report score': 'Final Report Score',
+        'Absorption rate': 'Absorption Rate',
         'Progress report score': 'Progress Report',
         'QS report score': 'QS Report',
     }
@@ -355,7 +397,14 @@ if uploaded_file is not None:
         with col3:
             st.metric("📄 No Data (all criteria missing)", f"{overall['no_data_all']:,}")
 
-    st.plotly_chart(create_overall_pie(overall, overall_mode), use_container_width=True)
+    # ── NEW: Side-by-Side Overall & Sector Pie Charts ────────────────────────
+    col_pie_main, col_divider, col_pie_sec = st.columns([10, 1, 10])
+    with col_pie_main:
+        st.plotly_chart(create_overall_pie(overall, overall_mode), use_container_width=True)
+    with col_divider:
+        st.markdown('<div class="vline"></div>', unsafe_allow_html=True)
+    with col_pie_sec:
+        st.plotly_chart(create_sector_pies(metrics['sector_metrics'], overall_mode), use_container_width=True)
 
     st.subheader("📋 Per-Criterion Results")
     summary_data = []
@@ -417,8 +466,8 @@ else:
         "• `Project ID`\n"
         "• `Organization name`\n"
         "• `Sector` (SCH, VET, ADU)\n"
-        "• `Final report score (Average)`\n"
-        "• `Absorption rate (Average)`\n"
+        "• `Final report score`\n"
+        "• `Absorption rate`\n"
         "• `Progress report score`\n"
         "• `QS report score`"
     )
