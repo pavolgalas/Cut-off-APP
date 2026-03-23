@@ -65,14 +65,14 @@ def show_data_preview(df, cutoffs):
     st.dataframe(pd.DataFrame(stats_data), use_container_width=True)
 
     st.subheader("📉 Distribution vs Cutoff Lines")
-    st.markdown("🔴 Red dashed line = current cutoff value (for filtered data).")
+    st.markdown("🔴 Red dashed line = current cutoff value.")
 
     cols = st.columns(2)
     for i, col in enumerate(criteria):
         with cols[i % 2]:
             data = df[col].dropna()
             if len(data) == 0:
-                st.info(f"No data for {criteria_display[col]} in current filter.")
+                st.info(f"No data for {criteria_display[col]}.")
                 continue
             fig = px.histogram(
                 data,
@@ -90,19 +90,14 @@ def show_data_preview(df, cutoffs):
                 annotation_text=f"Cutoff: {cutoffs[col]:.1f}",
                 annotation_position="top right"
             )
-            fig.update_layout(
-                height=300,
-                showlegend=False,
-                xaxis_title="Score",
-                yaxis_title="Projects"
-            )
+            fig.update_layout(height=300, showlegend=False)
             st.plotly_chart(fig, use_container_width=True)
 
-def calculate_metrics(df, cutoffs, overall_mode="available_only"):
+def calculate_metrics(df, cutoffs, overall_mode="all_data"):
     """
     overall_mode:
-      - 'available_only': only projects with at least one criterion filled (current logic)
-      - 'all_projects': all projects; classify as pass/fail/no_data_all
+    - 'all_data': Mode 1 - Only projects with ALL criteria filled (pass/fail only)
+    - 'all_projects': Mode 2 - All projects (pass / fail / no data for ALL criteria)
     """
     metrics = {}
     criteria = [
@@ -112,7 +107,7 @@ def calculate_metrics(df, cutoffs, overall_mode="available_only"):
         'QS report score'
     ]
 
-    # Per-criterion
+    # Per-criterion metrics (unchanged)
     for criterion in criteria:
         col_data = df[criterion].dropna()
         pass_count = (col_data >= cutoffs[criterion]).sum()
@@ -128,58 +123,62 @@ def calculate_metrics(df, cutoffs, overall_mode="available_only"):
             'no_data_pct': no_data / total * 100 if total > 0 else 0,
         }
 
-    # Overall
+    # Overall analysis - CORRECTED LOGIC
     overall_pass = 0
     overall_fail = 0
-    overall_no_data_all = 0  # for mode 2
+    overall_no_data_all = 0
 
     for _, row in df.iterrows():
-        applicable = [c for c in criteria if pd.notna(row[c])]
+        has_all_data = all(pd.notna(row[c]) for c in criteria)
+        no_data_all = all(pd.isna(row[c]) for c in criteria)
 
-        if overall_mode == "available_only":
-            # Mode 1: ignore projects with no data in all criteria
-            if not applicable:
-                continue
-            passes_all = all(row[c] >= cutoffs[c] for c in applicable)
-            if passes_all:
-                overall_pass += 1
-            else:
-                overall_fail += 1
-
-        elif overall_mode == "all_projects":
-            # Mode 2: classify EVERY project into pass / fail / no data at all
-            if not applicable:
-                overall_no_data_all += 1
-            else:
-                passes_all = all(row[c] >= cutoffs[c] for c in applicable)
+        if overall_mode == "all_data":
+            # Mode 1: ONLY projects with ALL criteria filled
+            if has_all_data:
+                passes_all = all(row[c] >= cutoffs[c] for c in criteria)
                 if passes_all:
                     overall_pass += 1
                 else:
                     overall_fail += 1
 
-    if overall_mode == "available_only":
-        total_eval = overall_pass + overall_fail
+        elif overall_mode == "all_projects":
+            # Mode 2: ALL projects
+            if no_data_all:
+                overall_no_data_all += 1
+            elif has_all_data:
+                # All data filled - pass/fail
+                passes_all = all(row[c] >= cutoffs[c] for c in criteria)
+                if passes_all:
+                    overall_pass += 1
+                else:
+                    overall_fail += 1
+            else:
+                # Partial data - fail (doesn't pass ALL applicable)
+                overall_fail += 1
+
+    total_all = len(df)
+    total_complete = overall_pass + overall_fail
+
+    if overall_mode == "all_data":
         metrics['overall'] = {
             'pass': overall_pass,
             'fail': overall_fail,
-            'no_data_all': 0,  # not used in this mode
-            'total_evaluated': total_eval,
-            'total_projects': len(df),
-            'pass_pct': overall_pass / total_eval * 100 if total_eval > 0 else 0,
-            'fail_pct': overall_fail / total_eval * 100 if total_eval > 0 else 0,
-            'no_data_all_pct': 0
+            'no_data_all': total_all - total_complete,
+            'total_complete': total_complete,
+            'total_projects': total_all,
+            'pass_pct': overall_pass / total_complete * 100 if total_complete > 0 else 0,
+            'fail_pct': overall_fail / total_complete * 100 if total_complete > 0 else 0,
         }
-    else:
-        total_projects = len(df)
+    else:  # all_projects
         metrics['overall'] = {
             'pass': overall_pass,
             'fail': overall_fail,
             'no_data_all': overall_no_data_all,
-            'total_evaluated': overall_pass + overall_fail,  # with any data
-            'total_projects': total_projects,
-            'pass_pct': overall_pass / total_projects * 100 if total_projects > 0 else 0,
-            'fail_pct': overall_fail / total_projects * 100 if total_projects > 0 else 0,
-            'no_data_all_pct': overall_no_data_all / total_projects * 100 if total_projects > 0 else 0
+            'total_complete': total_complete,
+            'total_projects': total_all,
+            'pass_pct': overall_pass / total_all * 100,
+            'fail_pct': overall_fail / total_all * 100,
+            'no_data_all_pct': overall_no_data_all / total_all * 100,
         }
 
     return metrics
@@ -206,18 +205,16 @@ def create_pie_charts(metrics, criteria_display):
                 marker=dict(colors=colors, line=dict(color='#000', width=1)),
                 textinfo='label+percent',
                 showlegend=False,
-                hovertemplate='<b>%{label}</b><br>Projects: %{value}<extra></extra>',
             ),
             row=row,
             col=col,
         )
 
-    fig.update_layout(height=700, title="📊 Performance Distribution (Filtered)")
+    fig.update_layout(height=700, title="📊 Per-Criterion Distribution")
     return fig
 
 # MAIN APP
 st.title("🎯 Project Cutoff Analysis Tool")
-st.markdown("Upload data → filter by sector → set cutoffs → analyze.")
 
 uploaded_file = st.sidebar.file_uploader("📁 Upload Excel", type=['xlsx', 'xls'])
 
@@ -226,30 +223,23 @@ if uploaded_file is not None:
 
     st.sidebar.header("📂 Sector Filter")
     sector_options = ['All'] + sorted(df_full['Sector'].dropna().unique().tolist())
-    selected_sector = st.sidebar.selectbox(
-        "Select sector",
-        options=sector_options,
-        index=0
-    )
+    selected_sector = st.sidebar.selectbox("Sector", sector_options, index=0)
 
-    if selected_sector == 'All':
-        df = df_full.copy()
-    else:
-        df = df_full[df_full['Sector'] == selected_sector].copy()
+    df = df_full.copy() if selected_sector == 'All' else df_full[df_full['Sector'] == selected_sector].copy()
+    st.sidebar.caption(f"📊 {len(df)} projects")
 
-    st.sidebar.caption(f"Filtered projects: {len(df)} / {len(df_full)}")
-
-    # NEW: Overall analysis mode switch
-    st.sidebar.header("⚙ Overall Pass/Fail Mode")
-    overall_mode_label = st.sidebar.radio(
-        "Select overall analysis logic:",
-        options=(
-            "Only projects with data in at least one criterion",
-            "All projects (pass / fail / no data for all criteria)",
-        ),
+    # NEW: Overall mode switch
+    st.sidebar.header("🎛 Overall Analysis Mode")
+    overall_mode = st.sidebar.radio(
+        "Pass/Fail calculation:",
+        [
+            "1. Only projects with ALL criteria filled",
+            "2. All projects (incl. no data for all criteria)"
+        ],
         index=0,
+        help="Mode 1: Strict - requires all 4 criteria filled.\nMode 2: Complete - classifies every project."
     )
-    overall_mode = "available_only" if overall_mode_label.startswith("Only") else "all_projects"
+    overall_mode = "all_data" if "1. Only" in overall_mode else "all_projects"
 
     criteria_display = {
         'Final report score (Average)': 'Final Report Score',
@@ -259,76 +249,47 @@ if uploaded_file is not None:
     }
 
     st.sidebar.header("🎯 Cutoff Thresholds")
-
     def safe_quantile(series, q, fallback):
         series = series.dropna()
         return float(series.quantile(q)) if len(series) > 0 else fallback
 
     cutoffs = {}
     cutoffs['Final report score (Average)'] = st.sidebar.slider(
-        "Final Report Score",
-        0.0,
-        100.0,
-        safe_quantile(df['Final report score (Average)'], 0.75, 75.0),
-        0.5,
-    )
+        "Final Report Score", 0.0, 100.0,
+        safe_quantile(df['Final report score (Average)'], 0.75, 75.0), 0.5)
     cutoffs['Absorption rate (Average)'] = st.sidebar.slider(
-        "Absorption Rate",
-        0.0,
-        100.0,
-        safe_quantile(df['Absorption rate (Average)'], 0.75, 75.0),
-        0.5,
-    )
+        "Absorption Rate", 0.0, 100.0,
+        safe_quantile(df['Absorption rate (Average)'], 0.75, 75.0), 0.5)
     cutoffs['Progress report score'] = st.sidebar.slider(
-        "Progress Report",
-        0.0,
-        45.0,
-        safe_quantile(df['Progress report score'], 0.75, 30.0),
-        0.5,
-    )
+        "Progress Report", 0.0, 45.0,
+        safe_quantile(df['Progress report score'], 0.75, 30.0), 0.5)
     cutoffs['QS report score'] = st.sidebar.slider(
-        "QS Report",
-        0.0,
-        45.0,
-        safe_quantile(df['QS report score'], 0.75, 30.0),
-        0.5,
-    )
+        "QS Report", 0.0, 45.0,
+        safe_quantile(df['QS report score'], 0.75, 30.0), 0.5)
 
     show_data_preview(df, cutoffs)
 
-    st.header("🎯 Analysis Results (Filtered)")
-    metrics = calculate_metrics(df, cutoffs, overall_mode=overall_mode)
+    st.header("🎯 Overall Pass/Fail Analysis")
+    metrics = calculate_metrics(df, cutoffs, overall_mode)
 
     overall = metrics['overall']
 
     col1, col2, col3 = st.columns(3)
     with col1:
-        st.metric(
-            "🎉 Projects Passing",
-            f"{overall['pass']:,}",
-            f"{overall['pass_pct']:.1f}%",
-        )
+        st.metric("🎉 Pass All Criteria", f"{overall['pass']:,}", f"{overall['pass_pct']:.1f}%")
     with col2:
-        st.metric(
-            "❌ Projects Failing",
-            f"{overall['fail']:,}",
-            f"{overall['fail_pct']:.1f}%",
-        )
-    with col3:
-        if overall_mode == "available_only":
-            st.metric(
-                "📈 Evaluated (with any data)",
-                f"{overall['total_evaluated']:,}",
-                f"{overall['total_projects']:,} in filter",
-            )
-        else:
-            st.metric(
-                "📈 Total projects in filter",
-                f"{overall['total_projects']:,}",
-                f"No data: {overall['no_data_all']:,} ({overall['no_data_all_pct']:.1f}%)",
-            )
+        st.metric("❌ Fail Any Criteria", f"{overall['fail']:,}", f"{overall['fail_pct']:.1f}%")
+    
+    if overall_mode == "all_data":
+        with col3:
+            st.metric("📊 Projects with Complete Data", f"{overall['total_complete']:,}", 
+                     f"({overall['total_complete']/len(df)*100:.1f}% of total)")
+    else:
+        with col3:
+            st.metric("📄 No Data (All Criteria)", f"{overall['no_data_all']:,}", 
+                     f"{overall['no_data_all']/len(df)*100:.1f}%")
 
-    st.subheader("📋 Detailed Results (per criterion)")
+    st.subheader("📋 Per-Criterion Results")
     summary_data = []
     for c in criteria_display:
         m = metrics[c]
@@ -341,29 +302,26 @@ if uploaded_file is not None:
         })
     st.dataframe(pd.DataFrame(summary_data), use_container_width=True)
 
-    st.subheader("🥧 Performance Visuals")
+    st.subheader("🥧 Visuals")
     fig = create_pie_charts(metrics, criteria_display)
     st.plotly_chart(fig, use_container_width=True)
 
     csv_data = pd.DataFrame(summary_data).to_csv(index=False).encode('utf-8')
     st.download_button(
-        "💾 Download Results CSV",
+        "💾 Download CSV",
         csv_data,
-        f"cutoff_analysis_{selected_sector.lower() if selected_sector!='All' else 'all'}_{overall_mode}.csv",
-        "text/csv",
+        f"analysis_{selected_sector}_{overall_mode}.csv",
+        "text/csv"
     )
+
 else:
     st.info(
-        "👈 Upload an Excel file to start.\n\n"
-        "Required columns:\n"
-        "• Sector (e.g. SCH, VET, ADU)\n"
-        "• Final report score (Average)\n"
-        "• Absorption rate (Average)\n"
-        "• Progress report score\n"
-        "• QS report score"
+        "👈 Upload Excel file\n\n"
+        "**Required columns:**\n"
+        "• `Sector` (SCH, VET, ADU)\n"
+        "• `Final report score (Average)`\n"
+        "• `Absorption rate (Average)`\n"
+        "• `Progress report score`\n"
+        "• `QS report score`"
     )
 # In[ ]:
-
-
-
-
