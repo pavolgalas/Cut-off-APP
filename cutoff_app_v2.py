@@ -281,7 +281,7 @@ def create_pie_charts(metrics, criteria_display):
     return fig
 
 # ── MAIN APP ──────────────────────────────────────────────────────────────────
-st.title("🎯 Project Cutoff Analysis Tool")
+st.title("🎯 Re-accreditation Cutoff Analysis Tool")
 
 uploaded_file = st.sidebar.file_uploader("📁 Upload Excel", type=['xlsx', 'xls'])
 
