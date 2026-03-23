@@ -77,10 +77,11 @@ def show_data_preview(df, cutoffs):
             'Cutoff': f"{cutoffs[col]:.1f}"
         })
     st.subheader("📈 Statistics & Current Cutoffs")
+    st.markdown("Basic overview of uploaded data initialin the given criteria. Together with the distribution below, it could guide the intial setting of cut-off scores.")
     st.dataframe(pd.DataFrame(stats_data), use_container_width=True)
 
     st.subheader("📉 Distribution vs Cutoff Lines")
-    st.markdown("🔴 Red dashed line = current cutoff value. Data is grouped into consecutive number ranges (bins), and each bar shows how many data points fall into each range, helping visualize the distribution of values.")
+    st.markdown("Data is grouped into consecutive number ranges (bins), and each bar shows how many data points fall into each range, helping visualize the distribution of values. 🔴 Red dashed line = current cutoff value.")
     cols = st.columns(2)
     for i, col in enumerate(criteria):
         with cols[i % 2]:
