@@ -12,6 +12,9 @@ import io
 st.markdown("""
 <style>
 .metric-card {background: linear-gradient(135deg,#f5f7fa 0%,#c3cfe2 100%);padding:1rem;border-radius:10px;border-left:5px solid #1f77b4;}
+/* Increase metric delta (the green/red text below the number) size by ~50% */
+[data-testid="stMetricDelta"] > div {font-size: 1.4rem !important;}
+[data-testid="stMetricDelta"] svg {width: 1.5rem !important; height: 1.5rem !important;}
 </style>
 """, unsafe_allow_html=True)
 
@@ -149,7 +152,6 @@ def calculate_metrics(df, cutoffs, overall_mode="all_data"):
             'no_data_all_pct': excluded / total_projects * 100 if total_projects > 0 else 0,
         }
     else:
-        # MODE 2 FIX: calculate percentages strictly out of evaluated projects (pass + fail)
         total_evaluated = overall_pass + overall_fail
         metrics['overall'] = {
             'pass': overall_pass,
@@ -173,7 +175,6 @@ def create_overall_pie(overall, overall_mode):
         colors = ['#4CAF50', '#F44336']
         title = "Overall (projects with ALL criteria filled)"
     else:
-        # MODE 2 FIX: Only chart Pass and Fail for share representation
         labels = ['✅ Pass', '❌ Fail']
         values = [overall['pass'], overall['fail']]
         colors = ['#4CAF50', '#F44336']
@@ -322,7 +323,6 @@ if uploaded_file is not None:
                      f"{overall['total_complete']:,} / {overall['total_projects']:,}",
                      f"{overall['no_data_all_pct']:.1f}% excluded (missing data)")
     else:
-        # MODE 2 FIX: Text displays reflect percentage out of EVALUATED
         col1, col2, col3 = st.columns(3)
         with col1:
             st.metric("🎉 Pass (applicable criteria)", f"{overall['pass']:,}",
