@@ -77,7 +77,7 @@ def show_data_preview(df, cutoffs):
             'Cutoff': f"{cutoffs[col]:.1f}"
         })
     st.subheader("📈 Statistics & Current Cutoffs")
-    st.markdown("Basic overview of uploaded data initialin the given criteria. Together with the distribution below, it could guide the intial setting of cut-off scores.")
+    st.markdown("Basic overview of uploaded data in the given criteria. Together with the distribution below, it could guide the intial setting of cut-off scores.")
     st.dataframe(pd.DataFrame(stats_data), use_container_width=True)
 
     st.subheader("📉 Distribution vs Cutoff Lines")
