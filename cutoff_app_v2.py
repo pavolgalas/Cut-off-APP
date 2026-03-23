@@ -69,14 +69,6 @@ def show_data_preview(df, cutoffs):
             st.plotly_chart(fig, use_container_width=True)
 
 def calculate_metrics(df, cutoffs, overall_mode="all_data"):
-    """
-    overall_mode:
-    - 'all_data':      Only projects with ALL 4 criteria filled → pass / fail
-    - 'all_projects':  Every project → pass / fail / no data
-                       Pass = passes ALL criteria for which data IS available
-                       Fail = fails at least one criterion for which data IS available
-                       No Data = no data for ANY criterion
-    """
     metrics = {}
     criteria = ['Final report score (Average)','Absorption rate (Average)',
                 'Progress report score','QS report score']
@@ -107,22 +99,17 @@ def calculate_metrics(df, cutoffs, overall_mode="all_data"):
         applicable    = [c for c in criteria if pd.notna(row[c])]
 
         if overall_mode == "all_data":
-            # Mode 1: only projects with ALL 4 criteria filled
             if has_all_data:
                 passes_all = all(row[c] >= cutoffs[c] for c in criteria)
                 if passes_all:
                     overall_pass += 1
                 else:
                     overall_fail += 1
-            # projects with any missing data are excluded entirely
 
         elif overall_mode == "all_projects":
-            # Mode 2: every project is classified
             if not applicable:
-                # No data for any criterion at all
                 overall_no_data_all += 1
             else:
-                # Pass ALL criteria for which data is available
                 passes_all = all(row[c] >= cutoffs[c] for c in applicable)
                 if passes_all:
                     overall_pass += 1
@@ -145,7 +132,6 @@ def calculate_metrics(df, cutoffs, overall_mode="all_data"):
             'no_data_all_pct': excluded / total_projects * 100 if total_projects > 0 else 0,
         }
     else:
-        # Mode 2: percentages out of ALL projects
         metrics['overall'] = {
             'pass': overall_pass,
             'fail': overall_fail,
@@ -215,14 +201,12 @@ uploaded_file = st.sidebar.file_uploader("📁 Upload Excel", type=['xlsx', 'xls
 if uploaded_file is not None:
     df_full = load_data(uploaded_file.read())
 
-    # Sector filter
     st.sidebar.header("📂 Sector Filter")
     sector_options = ['All'] + sorted(df_full['Sector'].dropna().unique().tolist())
     selected_sector = st.sidebar.selectbox("Sector", sector_options, index=0)
     df = df_full.copy() if selected_sector == 'All' else df_full[df_full['Sector'] == selected_sector].copy()
     st.sidebar.caption(f"📊 {len(df)} / {len(df_full)} projects")
 
-    # Overall mode
     st.sidebar.header("🎛 Overall Analysis Mode")
     mode_label = st.sidebar.radio(
         "Pass/Fail calculation:",
@@ -234,30 +218,34 @@ if uploaded_file is not None:
     )
     overall_mode = "all_data" if "1." in mode_label else "all_projects"
 
-    # Mode explanation
     if overall_mode == "all_data":
         st.sidebar.caption("✏️ Only projects with all 4 scores filled are evaluated.")
     else:
         st.sidebar.caption("✏️ Every project is classified. Pass = meets cutoff on all criteria where data exists.")
 
-    # Cutoff sliders + number inputs
     st.sidebar.header("🎯 Cutoff Thresholds")
 
     def safe_quantile(series, q, fallback):
         series = series.dropna()
-        return float(series.quantile(q)) if len(series) > 0 else fallback
+        if len(series) > 0:
+            val = series.quantile(q)
+            return float(val) if not pd.isna(val) else fallback
+        return fallback
 
     def cutoff_widget(label, col_key, min_val, max_val, default):
+        # FIX: Ensure the default value is STRICTLY clamped between min_val and max_val
+        clamped_default = max(min_val, min(float(default), max_val))
+        
         st.sidebar.markdown(f"**{label}**")
         c1, c2 = st.sidebar.columns([3, 1])
         with c1:
             slider_val = st.slider(" ", min_value=min_val, max_value=max_val,
-                                   value=default, step=0.5,
-                                   key=f"slider_{col_key}")
+                                   value=clamped_default, step=0.5,
+                                   key=f"slider_{col_key}", label_visibility="collapsed")
         with c2:
             num_val = st.number_input(" ", min_value=min_val, max_value=max_val,
                                       value=slider_val, step=0.5,
-                                      key=f"num_{col_key}", format="%.1f")
+                                      key=f"num_{col_key}", format="%.1f", label_visibility="collapsed")
         return num_val
 
     cutoffs = {}
@@ -281,15 +269,12 @@ if uploaded_file is not None:
         'QS report score': 'QS Report',
     }
 
-    # Data preview
     show_data_preview(df, cutoffs)
 
-    # Analysis
     st.header("🎯 Overall Pass/Fail Analysis")
     metrics = calculate_metrics(df, cutoffs, overall_mode)
     overall = metrics['overall']
 
-    # Overall metrics cards
     if overall_mode == "all_data":
         col1, col2, col3 = st.columns(3)
         with col1:
@@ -314,10 +299,8 @@ if uploaded_file is not None:
             st.metric("📄 No Data (all criteria missing)", f"{overall['no_data_all']:,}",
                      f"{overall['no_data_all_pct']:.1f}% of all projects")
 
-    # Overall pie chart
     st.plotly_chart(create_overall_pie(overall, overall_mode), use_container_width=True)
 
-    # Per-criterion table
     st.subheader("📋 Per-Criterion Results")
     summary_data = []
     for c in criteria_display:
@@ -331,12 +314,10 @@ if uploaded_file is not None:
         })
     st.dataframe(pd.DataFrame(summary_data), use_container_width=True)
 
-    # Per-criterion pie charts
     st.subheader("🥧 Per-Criterion Visuals")
     fig = create_pie_charts(metrics, criteria_display)
     st.plotly_chart(fig, use_container_width=True)
 
-    # Download
     csv_data = pd.DataFrame(summary_data).to_csv(index=False).encode('utf-8')
     st.download_button("💾 Download CSV", csv_data,
                       f"analysis_{selected_sector}_{overall_mode}.csv", "text/csv")
@@ -349,5 +330,6 @@ else:
         "• `Final report score (Average)`\n"
         "• `Absorption rate (Average)`\n"
         "• `Progress report score`\n"
-        "• `QS report score`")
+        "• `QS report score`"
+    )
 # In[ ]:
