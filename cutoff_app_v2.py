@@ -8,6 +8,22 @@ import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import io
+import os
+
+# Set page config to adjust title and favicon
+st.set_page_config(page_title="Project Cutoff Analysis", page_icon="🎯", layout="wide")
+
+# ── LOGO SETUP ────────────────────────────────────────────────────────────────
+# Option 1: Top left sidebar logo (requires Streamlit >= 1.35.0)
+# Replace "logo.png" with the path to your actual logo file.
+LOGO_PATH = "logo.png"
+
+if os.path.exists("logo.png"):
+    try:
+        st.logo("logo.png", icon_image=LOGO_PATH)
+    except AttributeError:
+        # Fallback for older Streamlit versions
+        st.sidebar.image("logo.png", use_column_width=True)
 
 st.markdown("""
 <style>
@@ -80,7 +96,6 @@ def calculate_metrics(df, cutoffs, overall_mode="all_data"):
     criteria = ['Final report score (Average)','Absorption rate (Average)',
                 'Progress report score','QS report score']
 
-    # Per-criterion metrics
     for criterion in criteria:
         col_data = df[criterion].dropna()
         pass_count = (col_data >= cutoffs[criterion]).sum()
@@ -96,7 +111,6 @@ def calculate_metrics(df, cutoffs, overall_mode="all_data"):
             'no_data_pct': no_data / total * 100 if total > 0 else 0,
         }
 
-    # Overall metrics
     overall_pass = 0
     overall_fail = 0
     overall_no_data_all = 0
@@ -217,6 +231,14 @@ def create_pie_charts(metrics, criteria_display):
     return fig
 
 # ── MAIN APP ──────────────────────────────────────────────────────────────────
+# Option 2: Main page header logo (uncomment if you want a big logo at the top)
+# if os.path.exists(LOGO_PATH):
+#     col_logo, col_title = st.columns([1, 4])
+#     with col_logo:
+#         st.image(LOGO_PATH, width=100)
+#     with col_title:
+#         st.title("🎯 Project Cutoff Analysis Tool")
+# else:
 st.title("🎯 Project Cutoff Analysis Tool")
 
 uploaded_file = st.sidebar.file_uploader("📁 Upload Excel", type=['xlsx', 'xls'])
@@ -354,8 +376,8 @@ if uploaded_file is not None:
 
     # ── Failed Projects Table ──────────────────────────────────────
     st.markdown("---")
-    st.header("⚠️ Failed Accreditations list")
-    st.write("List of KA120 projects that failed the selected overall criteria logic.")
+    st.header("⚠️ Failed Projects List")
+    st.write("List of projects that failed the selected overall criteria logic.")
     
     failed_projects_raw = metrics['failed_projects']
     if failed_projects_raw:
