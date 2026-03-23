@@ -318,7 +318,7 @@ if uploaded_file is not None:
     sector_options = ['All'] + sorted(df_full['Sector'].dropna().unique().tolist())
     selected_sector = st.sidebar.selectbox("Sector", sector_options, index=0)
     df = df_full.copy() if selected_sector == 'All' else df_full[df_full['Sector'] == selected_sector].copy()
-    st.sidebar.caption(f"📊 {len(df)} / {len(df_full)} projects")
+    st.sidebar.caption(f"📊 {len(df)} / {len(df_full)} accreditations")
 
     st.sidebar.header("🎯 Cutoff Thresholds")
 
