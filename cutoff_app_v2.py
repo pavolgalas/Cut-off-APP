@@ -286,7 +286,7 @@ if uploaded_file is not None:
                      f"({overall['total_complete']/len(df)*100:.1f}% of total)")
     else:
         with col3:
-            st.metric("📄 No Data (All Criteria)", f"{overall['no_data_all']:,}", 
+            st.metric("📄 No Data available", f"{overall['no_data_all']:,}", 
                      f"{overall['no_data_all']/len(df)*100:.1f}%")
 
     st.subheader("📋 Per-Criterion Results")
