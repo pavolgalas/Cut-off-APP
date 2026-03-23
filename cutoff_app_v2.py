@@ -18,7 +18,12 @@ st.markdown("""
 @st.cache_data
 def load_data(file_bytes):
     df = pd.read_excel(io.BytesIO(file_bytes))
-    required_cols = ['Sector','Final report score (Average)','Absorption rate (Average)','Progress report score','QS report score']
+    # ADDED: 'Project ID' and 'Organization name' to required columns
+    required_cols = [
+        'Project ID', 'Organization name', 'Sector',
+        'Final report score (Average)', 'Absorption rate (Average)',
+        'Progress report score', 'QS report score'
+    ]
     missing = [col for col in required_cols if col not in df.columns]
     if missing:
         st.error(f"❌ Missing columns: {', '.join(missing)}")
@@ -73,6 +78,7 @@ def calculate_metrics(df, cutoffs, overall_mode="all_data"):
     criteria = ['Final report score (Average)','Absorption rate (Average)',
                 'Progress report score','QS report score']
 
+    # Per-criterion metrics
     for criterion in criteria:
         col_data = df[criterion].dropna()
         pass_count = (col_data >= cutoffs[criterion]).sum()
@@ -88,9 +94,11 @@ def calculate_metrics(df, cutoffs, overall_mode="all_data"):
             'no_data_pct': no_data / total * 100 if total > 0 else 0,
         }
 
+    # Overall metrics
     overall_pass = 0
     overall_fail = 0
     overall_no_data_all = 0
+    failed_projects_data = [] # NEW: tracking list for failed projects
 
     for _, row in df.iterrows():
         has_all_data  = all(pd.notna(row[c]) for c in criteria)
@@ -98,21 +106,35 @@ def calculate_metrics(df, cutoffs, overall_mode="all_data"):
 
         if overall_mode == "all_data":
             if has_all_data:
-                passes_all = all(row[c] >= cutoffs[c] for c in criteria)
-                if passes_all:
+                failed_crits = [c for c in criteria if row[c] < cutoffs[c]]
+                if not failed_crits:
                     overall_pass += 1
                 else:
                     overall_fail += 1
+                    # Record the failure details
+                    failed_projects_data.append({
+                        'Project ID': row['Project ID'],
+                        'Sector': row['Sector'],
+                        'Organization name': row['Organization name'],
+                        'Failed Criteria Raw': failed_crits
+                    })
 
         elif overall_mode == "all_projects":
             if not applicable:
                 overall_no_data_all += 1
             else:
-                passes_all = all(row[c] >= cutoffs[c] for c in applicable)
-                if passes_all:
+                failed_crits = [c for c in applicable if row[c] < cutoffs[c]]
+                if not failed_crits:
                     overall_pass += 1
                 else:
                     overall_fail += 1
+                    # Record the failure details
+                    failed_projects_data.append({
+                        'Project ID': row['Project ID'],
+                        'Sector': row['Sector'],
+                        'Organization name': row['Organization name'],
+                        'Failed Criteria Raw': failed_crits
+                    })
 
     total_projects = len(df)
 
@@ -140,6 +162,8 @@ def calculate_metrics(df, cutoffs, overall_mode="all_data"):
             'fail_pct': overall_fail / total_projects * 100 if total_projects > 0 else 0,
             'no_data_all_pct': overall_no_data_all / total_projects * 100 if total_projects > 0 else 0,
         }
+        
+    metrics['failed_projects'] = failed_projects_data # Add the list to our metrics dictionary
 
     return metrics
 
@@ -328,14 +352,50 @@ if uploaded_file is not None:
     fig = create_pie_charts(metrics, criteria_display)
     st.plotly_chart(fig, use_container_width=True)
 
+    # ── NEW FEATURE: Failed Projects Table ──────────────────────────────────────
+    st.markdown("---")
+    st.header("⚠️ Failed Projects List")
+    st.write("List of projects that failed the selected overall criteria logic.")
+    
+    failed_projects_raw = metrics['failed_projects']
+    if failed_projects_raw:
+        # Convert raw criteria names to nice display names
+        display_failed = []
+        for fp in failed_projects_raw:
+            mapped_crits = [criteria_display[c] for c in fp['Failed Criteria Raw']]
+            display_failed.append({
+                'Project ID': fp['Project ID'],
+                'Sector': fp['Sector'],
+                'Organization name': fp['Organization name'],
+                'Failed Criteria': ", ".join(mapped_crits)
+            })
+            
+        failed_df = pd.DataFrame(display_failed)
+        st.dataframe(failed_df, use_container_width=True, hide_index=True)
+        
+        # Adding a download button for just the failed list
+        csv_failed = failed_df.to_csv(index=False).encode('utf-8')
+        st.download_button(
+            "💾 Download Failed Projects CSV", 
+            csv_failed,
+            f"failed_projects_{selected_sector}_{overall_mode}.csv", 
+            "text/csv"
+        )
+    else:
+        st.success("🎉 No projects failed the current criteria!")
+
+    # ── Master Summary Download ─────────────────────────────────────────────────
+    st.markdown("---")
     csv_data = pd.DataFrame(summary_data).to_csv(index=False).encode('utf-8')
-    st.download_button("💾 Download CSV", csv_data,
-                      f"analysis_{selected_sector}_{overall_mode}.csv", "text/csv")
+    st.download_button("💾 Download Master Summary CSV", csv_data,
+                      f"analysis_summary_{selected_sector}_{overall_mode}.csv", "text/csv")
 
 else:
     st.info(
         "👈 Upload Excel file\n\n"
         "**Required columns:**\n"
+        "• `Project ID`\n"
+        "• `Organization name`\n"
         "• `Sector` (SCH, VET, ADU)\n"
         "• `Final report score (Average)`\n"
         "• `Absorption rate (Average)`\n"
