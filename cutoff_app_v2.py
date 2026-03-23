@@ -297,12 +297,6 @@ uploaded_file = st.sidebar.file_uploader("📁 Upload Excel", type=['xlsx', 'xls
 if uploaded_file is not None:
     df_full = load_data(uploaded_file.read())
 
-    st.sidebar.header("📂 Sector Filter")
-    sector_options = ['All'] + sorted(df_full['Sector'].dropna().unique().tolist())
-    selected_sector = st.sidebar.selectbox("Sector", sector_options, index=0)
-    df = df_full.copy() if selected_sector == 'All' else df_full[df_full['Sector'] == selected_sector].copy()
-    st.sidebar.caption(f"📊 {len(df)} / {len(df_full)} projects")
-
     st.sidebar.header("🎛 Overall Analysis Mode")
     mode_label = st.sidebar.radio(
         "Pass/Fail calculation:",
@@ -376,6 +370,12 @@ if uploaded_file is not None:
         'Progress report score': 'Progress Report',
         'QS report score': 'QS Report',
     }
+
+    st.sidebar.header("📂 Sector Filter")
+    sector_options = ['All'] + sorted(df_full['Sector'].dropna().unique().tolist())
+    selected_sector = st.sidebar.selectbox("Sector", sector_options, index=0)
+    df = df_full.copy() if selected_sector == 'All' else df_full[df_full['Sector'] == selected_sector].copy()
+    st.sidebar.caption(f"📊 {len(df)} / {len(df_full)} projects")
 
     show_data_preview(df, cutoffs)
 
