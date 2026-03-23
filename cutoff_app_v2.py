@@ -73,7 +73,6 @@ def calculate_metrics(df, cutoffs, overall_mode="all_data"):
     criteria = ['Final report score (Average)','Absorption rate (Average)',
                 'Progress report score','QS report score']
 
-    # Per-criterion metrics
     for criterion in criteria:
         col_data = df[criterion].dropna()
         pass_count = (col_data >= cutoffs[criterion]).sum()
@@ -89,7 +88,6 @@ def calculate_metrics(df, cutoffs, overall_mode="all_data"):
             'no_data_pct': no_data / total * 100 if total > 0 else 0,
         }
 
-    # Overall metrics
     overall_pass = 0
     overall_fail = 0
     overall_no_data_all = 0
@@ -232,21 +230,33 @@ if uploaded_file is not None:
             return float(val) if not pd.isna(val) else fallback
         return fallback
 
+    def sync_slider(key):
+        st.session_state[f"num_{key}"] = st.session_state[f"slider_{key}"]
+
+    def sync_num(key):
+        st.session_state[f"slider_{key}"] = st.session_state[f"num_{key}"]
+
     def cutoff_widget(label, col_key, min_val, max_val, default):
-        # FIX: Ensure the default value is STRICTLY clamped between min_val and max_val
         clamped_default = max(min_val, min(float(default), max_val))
         
+        if f"slider_{col_key}" not in st.session_state:
+            st.session_state[f"slider_{col_key}"] = clamped_default
+            st.session_state[f"num_{col_key}"] = clamped_default
+            
         st.sidebar.markdown(f"**{label}**")
         c1, c2 = st.sidebar.columns([3, 1])
         with c1:
-            slider_val = st.slider(" ", min_value=min_val, max_value=max_val,
-                                   value=clamped_default, step=0.5,
-                                   key=f"slider_{col_key}", label_visibility="collapsed")
+            st.slider(" ", min_value=min_val, max_value=max_val,
+                      key=f"slider_{col_key}", step=0.5, 
+                      on_change=sync_slider, args=(col_key,),
+                      label_visibility="collapsed")
         with c2:
-            num_val = st.number_input(" ", min_value=min_val, max_value=max_val,
-                                      value=slider_val, step=0.5,
-                                      key=f"num_{col_key}", format="%.1f", label_visibility="collapsed")
-        return num_val
+            st.number_input(" ", min_value=min_val, max_value=max_val,
+                            key=f"num_{col_key}", step=0.5, format="%.1f",
+                            on_change=sync_num, args=(col_key,),
+                            label_visibility="collapsed")
+            
+        return st.session_state[f"num_{col_key}"]
 
     cutoffs = {}
     cutoffs['Final report score (Average)'] = cutoff_widget(
