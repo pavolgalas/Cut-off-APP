@@ -11,7 +11,7 @@ import io
 import os
 
 # Set page config to adjust title and favicon
-st.set_page_config(page_title="Project Cutoff Analysis", page_icon="🎯", layout="wide")
+st.set_page_config(page_title="Re-accreditation Cutoff Analysis", page_icon="🎯", layout="wide")
 
 # ── LOGO SETUP ────────────────────────────────────────────────────────────────
 LOGO_PATH = "logo.png"
