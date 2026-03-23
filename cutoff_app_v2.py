@@ -279,7 +279,7 @@ def create_pie_charts(metrics, criteria_display):
         
     # Standardize height to 400 to match the other pies perfectly
     fig.update_layout(
-        height=400,
+        height=300,
         margin=dict(t=50, b=20, l=10, r=10),
         shapes=[
             dict(type="line", xref="paper", yref="paper", x0=0.24, y0=0.1, x1=0.24, y1=0.9, line=dict(color="rgba(128,128,128,0.2)", width=2)),
