@@ -307,17 +307,17 @@ if uploaded_file is not None:
     mode_label = st.sidebar.radio(
         "Pass/Fail calculation:",
         [
-            "1. Projects with ALL criteria filled (pass / fail)",
-            "2. All projects (pass / fail / no data for any criterion)",
+            "1. Accreditations with ALL 4 criteria available (pass / fail)",
+            "2. All accreditations (pass / fail / no data for any criterion)",
         ],
         index=0,
     )
     overall_mode = "all_data" if "1." in mode_label else "all_projects"
 
     if overall_mode == "all_data":
-        st.sidebar.caption("✏️ Only projects with all 4 scores filled are evaluated.")
+        st.sidebar.caption("✏️ Only accreditations with all 4 scores filled are evaluated.")
     else:
-        st.sidebar.caption("✏️ Every project is classified. Pass = meets cutoff on all criteria where data exists.")
+        st.sidebar.caption("✏️ Every accreditation is evaluated. Pass = meets cutoff on all criteria where data exists.")
 
     st.sidebar.header("🎯 Cutoff Thresholds")
 
@@ -433,8 +433,8 @@ if uploaded_file is not None:
 
     # ── Failed Projects Table ──────────────────────────────────────
     st.markdown("---")
-    st.header("⚠️ Failed Projects List")
-    st.write("List of projects that failed the selected overall criteria logic.")
+    st.header("⚠️ Failed Accreditations List")
+    st.write("List of accreditations KA120 that failed the selected overall criteria logic.")
     
     failed_projects_raw = metrics['failed_projects']
     if failed_projects_raw:
@@ -453,13 +453,13 @@ if uploaded_file is not None:
         
         csv_failed = failed_df.to_csv(index=False).encode('utf-8')
         st.download_button(
-            "💾 Download Failed Projects CSV", 
+            "💾 Download Failed KA120 Projects CSV", 
             csv_failed,
             f"failed_projects_{selected_sector}_{overall_mode}.csv", 
             "text/csv"
         )
     else:
-        st.success("🎉 No projects failed the current criteria!")
+        st.success("🎉 No KA120 projects failed the current criteria!")
 
     # ── Master Summary Download ─────────────────────────────────────────────────
     st.markdown("---")
