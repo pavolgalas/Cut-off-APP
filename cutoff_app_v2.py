@@ -18,7 +18,6 @@ st.markdown("""
 @st.cache_data
 def load_data(file_bytes):
     df = pd.read_excel(io.BytesIO(file_bytes))
-    # ADDED: 'Project ID' and 'Organization name' to required columns
     required_cols = [
         'Project ID', 'Organization name', 'Sector',
         'Final report score (Average)', 'Absorption rate (Average)',
@@ -98,7 +97,7 @@ def calculate_metrics(df, cutoffs, overall_mode="all_data"):
     overall_pass = 0
     overall_fail = 0
     overall_no_data_all = 0
-    failed_projects_data = [] # NEW: tracking list for failed projects
+    failed_projects_data = []
 
     for _, row in df.iterrows():
         has_all_data  = all(pd.notna(row[c]) for c in criteria)
@@ -111,7 +110,6 @@ def calculate_metrics(df, cutoffs, overall_mode="all_data"):
                     overall_pass += 1
                 else:
                     overall_fail += 1
-                    # Record the failure details
                     failed_projects_data.append({
                         'Project ID': row['Project ID'],
                         'Sector': row['Sector'],
@@ -128,7 +126,6 @@ def calculate_metrics(df, cutoffs, overall_mode="all_data"):
                     overall_pass += 1
                 else:
                     overall_fail += 1
-                    # Record the failure details
                     failed_projects_data.append({
                         'Project ID': row['Project ID'],
                         'Sector': row['Sector'],
@@ -152,18 +149,20 @@ def calculate_metrics(df, cutoffs, overall_mode="all_data"):
             'no_data_all_pct': excluded / total_projects * 100 if total_projects > 0 else 0,
         }
     else:
+        # MODE 2 FIX: calculate percentages strictly out of evaluated projects (pass + fail)
+        total_evaluated = overall_pass + overall_fail
         metrics['overall'] = {
             'pass': overall_pass,
             'fail': overall_fail,
             'no_data_all': overall_no_data_all,
-            'total_complete': overall_pass + overall_fail,
+            'total_complete': total_evaluated,
             'total_projects': total_projects,
-            'pass_pct': overall_pass / total_projects * 100 if total_projects > 0 else 0,
-            'fail_pct': overall_fail / total_projects * 100 if total_projects > 0 else 0,
+            'pass_pct': overall_pass / total_evaluated * 100 if total_evaluated > 0 else 0,
+            'fail_pct': overall_fail / total_evaluated * 100 if total_evaluated > 0 else 0,
             'no_data_all_pct': overall_no_data_all / total_projects * 100 if total_projects > 0 else 0,
         }
         
-    metrics['failed_projects'] = failed_projects_data # Add the list to our metrics dictionary
+    metrics['failed_projects'] = failed_projects_data
 
     return metrics
 
@@ -174,10 +173,11 @@ def create_overall_pie(overall, overall_mode):
         colors = ['#4CAF50', '#F44336']
         title = "Overall (projects with ALL criteria filled)"
     else:
-        labels = ['✅ Pass', '❌ Fail', '📄 No Data']
-        values = [overall['pass'], overall['fail'], overall['no_data_all']]
-        colors = ['#4CAF50', '#F44336', '#FF9800']
-        title = "Overall (all projects)"
+        # MODE 2 FIX: Only chart Pass and Fail for share representation
+        labels = ['✅ Pass', '❌ Fail']
+        values = [overall['pass'], overall['fail']]
+        colors = ['#4CAF50', '#F44336']
+        title = "Overall (all evaluated projects)"
 
     fig = go.Figure(go.Pie(
         labels=labels, values=values,
@@ -322,16 +322,16 @@ if uploaded_file is not None:
                      f"{overall['total_complete']:,} / {overall['total_projects']:,}",
                      f"{overall['no_data_all_pct']:.1f}% excluded (missing data)")
     else:
+        # MODE 2 FIX: Text displays reflect percentage out of EVALUATED
         col1, col2, col3 = st.columns(3)
         with col1:
             st.metric("🎉 Pass (applicable criteria)", f"{overall['pass']:,}",
-                     f"{overall['pass_pct']:.1f}% of all projects")
+                     f"{overall['pass_pct']:.1f}% of evaluated")
         with col2:
             st.metric("❌ Fail (any applicable criterion)", f"{overall['fail']:,}",
-                     f"{overall['fail_pct']:.1f}% of all projects")
+                     f"{overall['fail_pct']:.1f}% of evaluated")
         with col3:
-            st.metric("📄 No Data (all criteria missing)", f"{overall['no_data_all']:,}",
-                     f"{overall['no_data_all_pct']:.1f}% of all projects")
+            st.metric("📄 No Data (all criteria missing)", f"{overall['no_data_all']:,}")
 
     st.plotly_chart(create_overall_pie(overall, overall_mode), use_container_width=True)
 
@@ -352,14 +352,13 @@ if uploaded_file is not None:
     fig = create_pie_charts(metrics, criteria_display)
     st.plotly_chart(fig, use_container_width=True)
 
-    # ── NEW FEATURE: Failed Projects Table ──────────────────────────────────────
+    # ── Failed Projects Table ──────────────────────────────────────
     st.markdown("---")
     st.header("⚠️ Failed Projects List")
     st.write("List of projects that failed the selected overall criteria logic.")
     
     failed_projects_raw = metrics['failed_projects']
     if failed_projects_raw:
-        # Convert raw criteria names to nice display names
         display_failed = []
         for fp in failed_projects_raw:
             mapped_crits = [criteria_display[c] for c in fp['Failed Criteria Raw']]
@@ -373,7 +372,6 @@ if uploaded_file is not None:
         failed_df = pd.DataFrame(display_failed)
         st.dataframe(failed_df, use_container_width=True, hide_index=True)
         
-        # Adding a download button for just the failed list
         csv_failed = failed_df.to_csv(index=False).encode('utf-8')
         st.download_button(
             "💾 Download Failed Projects CSV", 
