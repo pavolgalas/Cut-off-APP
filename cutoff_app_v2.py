@@ -354,8 +354,8 @@ if uploaded_file is not None:
 
     # ── Failed Projects Table ──────────────────────────────────────
     st.markdown("---")
-    st.header("⚠️ Failed Projects List")
-    st.write("List of projects that failed the selected overall criteria logic.")
+    st.header("⚠️ Failed Accreditations list")
+    st.write("List of KA120 projects that failed the selected overall criteria logic.")
     
     failed_projects_raw = metrics['failed_projects']
     if failed_projects_raw:
