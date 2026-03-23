@@ -306,9 +306,9 @@ if uploaded_file is not None:
     overall_mode = "all_data" if "1." in mode_label else "all_projects"
 
     if overall_mode == "all_data":
-        st.sidebar.caption("✏️ Only projects with all 4 scores filled are evaluated.")
+        st.sidebar.caption("✏️ Only accreditations with all 4 criteria available are evaluated.")
     else:
-        st.sidebar.caption("✏️ Every project is classified. Pass = meets cutoff on all criteria where data exists.")
+        st.sidebar.caption("✏️ Every accreditation is evaluated. Pass = meets cutoff on all available criteria.")
 
     st.sidebar.header("🎯 Cutoff Thresholds")
 
