@@ -297,12 +297,6 @@ uploaded_file = st.sidebar.file_uploader("📁 Upload Excel", type=['xlsx', 'xls
 if uploaded_file is not None:
     df_full = load_data(uploaded_file.read())
 
-st.sidebar.header("📂 Sector Filter")
-    sector_options = ['All'] + sorted(df_full['Sector'].dropna().unique().tolist())
-    selected_sector = st.sidebar.selectbox("Sector", sector_options, index=0)
-    df = df_full.copy() if selected_sector == 'All' else df_full[df_full['Sector'] == selected_sector].copy()
-    st.sidebar.caption(f"📊 {len(df)} / {len(df_full)} projects")
-    
     st.sidebar.header("🎛 Overall Analysis Mode")
     mode_label = st.sidebar.radio(
         "Pass/Fail calculation:",
@@ -318,6 +312,13 @@ st.sidebar.header("📂 Sector Filter")
         st.sidebar.caption("✏️ Only accreditations with all 4 scores filled are evaluated.")
     else:
         st.sidebar.caption("✏️ Every accreditation is evaluated. Pass = meets cutoff on all criteria where data exists.")
+
+    # FIX: Moving the Sector Filter BEFORE the Cutoff Thresholds so `df` is defined!
+    st.sidebar.header("📂 Sector Filter")
+    sector_options = ['All'] + sorted(df_full['Sector'].dropna().unique().tolist())
+    selected_sector = st.sidebar.selectbox("Sector", sector_options, index=0)
+    df = df_full.copy() if selected_sector == 'All' else df_full[df_full['Sector'] == selected_sector].copy()
+    st.sidebar.caption(f"📊 {len(df)} / {len(df_full)} projects")
 
     st.sidebar.header("🎯 Cutoff Thresholds")
 
@@ -376,7 +377,7 @@ st.sidebar.header("📂 Sector Filter")
         'Progress report score': 'Progress Report',
         'QS report score': 'QS Report',
     }
-    
+
     show_data_preview(df, cutoffs)
 
     st.header("🎯 Overall Pass/Fail Analysis")
@@ -479,4 +480,5 @@ else:
         "• `Progress report score`\n"
         "• `QS report score`"
     )
+
 # In[ ]:
