@@ -429,7 +429,6 @@ if uploaded_file is not None:
         })
     st.dataframe(pd.DataFrame(summary_data), use_container_width=True)
 
-    st.subheader("🥧 Per-Criterion Visuals")
     fig = create_pie_charts(metrics, criteria_display)
     st.plotly_chart(fig, use_container_width=True)
 
