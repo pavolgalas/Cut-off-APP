@@ -77,10 +77,11 @@ def show_data_preview(df, cutoffs):
             'Cutoff': f"{cutoffs[col]:.1f}"
         })
     st.subheader("📈 Statistics & Current Cutoffs")
+    st.markdown("Basic overview of uploaded data in the given criteria. Together with the distribution below, it could guide the initial setting of cut-off scores. It also serves as a check of the upload and completeness of the data.")
     st.dataframe(pd.DataFrame(stats_data), use_container_width=True)
 
     st.subheader("📉 Distribution vs Cutoff Lines")
-    st.markdown("🔴 Red dashed line = current cutoff value.")
+    st.markdown("Data is grouped into consecutive number ranges (bins), and each bar shows how many data points fall into each range, helping visualize the distribution of values. 🔴 Red dashed line = current cutoff value.")
     cols = st.columns(2)
     for i, col in enumerate(criteria):
         with cols[i % 2]:
@@ -95,44 +96,6 @@ def show_data_preview(df, cutoffs):
                          annotation_position="top right")
             fig.update_layout(height=300, showlegend=False)
             st.plotly_chart(fig, use_container_width=True)
-
-    # ── Relations between criteria ──────────────────────────────────
-    st.markdown("---")
-    st.subheader("🔗 Relations between criteria")
-    st.markdown("Explore the correlation between final report/absorption scores and interim reports scores. 🔴 Red dashed line = current cutoff value.")
-    
-    col_x, col_y = st.columns(2)
-    with col_x:
-        x_axis_col = st.selectbox(
-            "Select X-axis:", 
-            options=['Final report score', 'Absorption rate'],
-            format_func=lambda x: criteria_display[x]
-        )
-    with col_y:
-        y_axis_col = st.selectbox(
-            "Select Y-axis:", 
-            options=['Progress report score', 'QS report score'],
-            format_func=lambda x: criteria_display[x]
-        )
-
-    scatter_fig = px.scatter(
-        df, 
-        x=x_axis_col, 
-        y=y_axis_col, 
-        color='Sector',  # Added Sector as the color category
-        color_discrete_map={'SCH': '#1f77b4', 'VET': '#ff7f0e', 'ADU': '#2ca02c'},
-        hover_data=['Project ID', 'Organization name', 'Sector'],
-        labels={
-            x_axis_col: criteria_display[x_axis_col], 
-            y_axis_col: criteria_display[y_axis_col]
-        },
-        title=f"{criteria_display[y_axis_col]} vs {criteria_display[x_axis_col]}"
-    )
-    # Add optional dashed lines to show where the current cutoffs sit on the scatter
-    scatter_fig.add_vline(x=cutoffs[x_axis_col], line_dash="dash", line_color="red", opacity=0.5)
-    scatter_fig.add_hline(y=cutoffs[y_axis_col], line_dash="dash", line_color="red", opacity=0.5)
-    
-    st.plotly_chart(scatter_fig, use_container_width=True)
 
 def calculate_metrics(df, cutoffs, overall_mode="all_data"):
     metrics = {}
@@ -351,11 +314,12 @@ if uploaded_file is not None:
     else:
         st.sidebar.caption("✏️ Every accreditation is evaluated. Pass = meets cutoff on all criteria where data exists.")
 
+    # FIX: Moving the Sector Filter BEFORE the Cutoff Thresholds so `df` is defined!
     st.sidebar.header("📂 Sector Filter")
     sector_options = ['All'] + sorted(df_full['Sector'].dropna().unique().tolist())
     selected_sector = st.sidebar.selectbox("Sector", sector_options, index=0)
     df = df_full.copy() if selected_sector == 'All' else df_full[df_full['Sector'] == selected_sector].copy()
-    st.sidebar.caption(f"📊 {len(df)} / {len(df_full)} projects")
+    st.sidebar.caption(f"📊 {len(df)} / {len(df_full)} accreditations")
 
     st.sidebar.header("🎯 Cutoff Thresholds")
 
@@ -465,7 +429,6 @@ if uploaded_file is not None:
         })
     st.dataframe(pd.DataFrame(summary_data), use_container_width=True)
 
-    st.subheader("🥧 Per-Criterion Visuals")
     fig = create_pie_charts(metrics, criteria_display)
     st.plotly_chart(fig, use_container_width=True)
 
