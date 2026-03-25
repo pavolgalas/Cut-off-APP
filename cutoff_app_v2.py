@@ -96,7 +96,7 @@ def show_data_preview(df, cutoffs):
             fig.update_layout(height=300, showlegend=False)
             st.plotly_chart(fig, use_container_width=True)
 
-    # ── NEW FEATURE: Relations between criteria ──────────────────────────────────
+    # ── Relations between criteria ──────────────────────────────────
     st.markdown("---")
     st.subheader("🔗 Relations between criteria")
     st.markdown("Explore the correlation between final scores and interim reports.")
@@ -119,12 +119,12 @@ def show_data_preview(df, cutoffs):
         df, 
         x=x_axis_col, 
         y=y_axis_col, 
+        color='Sector',  # Added Sector as the color category
         hover_data=['Project ID', 'Organization name', 'Sector'],
         labels={
             x_axis_col: criteria_display[x_axis_col], 
             y_axis_col: criteria_display[y_axis_col]
         },
-        color_discrete_sequence=['#1f77b4'],
         title=f"{criteria_display[y_axis_col]} vs {criteria_display[x_axis_col]}"
     )
     # Add optional dashed lines to show where the current cutoffs sit on the scatter
