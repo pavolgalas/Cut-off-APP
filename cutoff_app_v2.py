@@ -99,7 +99,7 @@ def show_data_preview(df, cutoffs):
     # ── Relations between criteria ──────────────────────────────────
     st.markdown("---")
     st.subheader("🔗 Relations between criteria")
-    st.markdown("Explore the correlation between final scores and interim reports.")
+    st.markdown("Explore the correlation between final report/absorption scores and interim reports scores. 🔴 Red dashed line = current cutoff value.")
     
     col_x, col_y = st.columns(2)
     with col_x:
