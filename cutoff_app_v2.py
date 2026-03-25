@@ -120,6 +120,7 @@ def show_data_preview(df, cutoffs):
         x=x_axis_col, 
         y=y_axis_col, 
         color='Sector',  # Added Sector as the color category
+        color_discrete_map={'SCH': '#1f77b4', 'VET': '#ff7f0e', 'ADU': '#2ca02c'},
         hover_data=['Project ID', 'Organization name', 'Sector'],
         labels={
             x_axis_col: criteria_display[x_axis_col], 
