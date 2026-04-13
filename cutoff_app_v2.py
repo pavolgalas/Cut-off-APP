@@ -402,10 +402,10 @@ if uploaded_file is not None:
         "Absorption Rate", "absorb", 0.0, 100.0,
         safe_quantile(df['Absorption rate'], 0.75, 75.0))
     cutoffs['Progress report score'] = cutoff_widget(
-        "Progress Report", "progress", 0.0, 45.0,
+        "Progress Report", "progress", 0.0, 50.0,
         safe_quantile(df['Progress report score'], 0.75, 30.0))
     cutoffs['QS report score'] = cutoff_widget(
-        "QS Report", "qs", 0.0, 45.0,
+        "QS Report", "qs", 0.0, 50.0,
         safe_quantile(df['QS report score'], 0.75, 30.0))
 
     criteria_display = {
